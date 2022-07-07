@@ -1,5 +1,5 @@
 // ---------------------------------------
-// IOracle server
+// IOracle main server
 // ---------------------------------------
 use rocket::{
     form::Form,
