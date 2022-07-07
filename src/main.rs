@@ -1,45 +1,52 @@
-// use log::{debug, error, info, trace, warn};
-use log::{error, info, warn};
-use std::collections::HashMap;
-use warp::{http::Uri, Filter};
+use rocket::{
+    form::Form,
+    response::Redirect,
+    tokio::time::{sleep, Duration},
+};
+use rocket_dyn_templates::Template;
 
-pub mod templates;
+#[macro_use]
+extern crate rocket;
 
-#[tokio::main]
-async fn main() {
-    pretty_env_logger::init();
-    info!("Starting IOracle");
+pub mod wires;
 
-    // ----------------------------------
-    // tokio::spawn(async move {
-    //     // process(socket).await;
-    // });
-    // ----------------------------------
-    // let handle = tokio::spawn(async {
-    //     // Do some async work
-    //     "return value"
-    // });
-    //
-    // // Do some other work
-    //
-    // let out = handle.await.unwrap();
-    // println!("GOT {}", out);
-    // ----------------------------------
+#[derive(FromForm)]
+struct FormData {
+    question: String,
+}
 
-    let home = warp::path::end().map(move || warp::reply::html(templates::HOME));
-    let answer = warp::path!("answer" / u32).map(|_a| warp::reply::html(templates::ANSWER));
-    let question = warp::path!("question")
-        .and(warp::post())
-        // Only accept bodies smaller than 64kb...
-        .and(warp::body::content_length_limit(1024 * 64))
-        .and(warp::body::form())
-        .map(|form: HashMap<String, String>| {
-            let question = form.get("question").unwrap();
-            info!("question: {}", question);
-            warp::redirect(Uri::from_static("/answer/42"))
-        });
+#[get("/")]
+fn home() -> Template {
+    Template::render("home", rocket_dyn_templates::context! {})
+}
 
-    warp::serve(home.or(answer).or(question))
-        .run(([127, 0, 0, 1], 4444))
-        .await;
+#[get("/answer/<id>")]
+fn answer(id: u64) -> Template {
+    // TODO: get answer by id
+    println!("answer id:{}", id);
+
+    Template::render(
+        "answer",
+        rocket_dyn_templates::context! {
+            answer: "42",
+        },
+    )
+}
+
+#[post("/question", data = "<form_data>")]
+async fn question(form_data: Form<FormData>) -> Redirect {
+    // TODO: process the question
+    println!("question: {}", form_data.question);
+    sleep(Duration::from_secs(20)).await;
+
+    Redirect::to(format!("/answer/{}", 42))
+}
+
+#[launch]
+fn rocket() -> _ {
+    // TODO: run periferal threads
+
+    rocket::build()
+        .mount("/", routes![home, question, answer])
+        .attach(Template::fairing())
 }

@@ -1,0 +1,9 @@
+{% extends "base" %}
+
+{% block content %}
+<h4>Welcome to IOracle!</h4>
+<form action="/question" method="post">
+    <p><textarea rows="8" cols="42" name="question"></textarea></p>
+    <input type="submit" value="Ask">
+</form>
+{% endblock content %}

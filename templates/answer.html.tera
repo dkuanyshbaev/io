@@ -1,0 +1,6 @@
+{% extends "base" %}
+
+{% block content %}
+<h4>Answer is {{ answer }}!</h4>
+<a href="/">Back</a>
+{% endblock content %}
