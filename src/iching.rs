@@ -10,8 +10,12 @@ pub struct Answer {
 
 impl Answer {
     pub fn new(question: String, hexagram: String, r_hexagram: String) -> Self {
-        // TODO: get answer to question
+        // ---------------------------------------
+        // TODO: generate answer to question!
+        // ---------------------------------------
         let answer = "42".to_string();
+        // ---------------------------------------
+
         Answer {
             question,
             answer,
@@ -20,7 +24,10 @@ impl Answer {
         }
     }
     pub fn get_by_id(_id: u64) -> Self {
-        // TODO: db search
+        // ---------------------------------------
+        // TODO: db search, return answer
+        // ---------------------------------------
+
         Answer {
             question: "question".to_string(),
             answer: "42".to_string(),
@@ -29,7 +36,10 @@ impl Answer {
         }
     }
     pub fn save(self) -> u64 {
+        // ---------------------------------------
         // TODO: save to db, return id
+        // ---------------------------------------
+
         42
     }
 }

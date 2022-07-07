@@ -27,9 +27,12 @@ fn home() -> Template {
 
 #[post("/question", data = "<form_data>")]
 async fn question(form_data: Form<FormData>) -> Redirect {
-    let (hexagram, r_hexagram) = wires::read();
+    // ---------------------------------------
     // TODO: real readings
+    // ---------------------------------------
+    let (hexagram, r_hexagram) = wires::read();
     sleep(Duration::from_secs(10)).await;
+    // ---------------------------------------
 
     let new_answer = iching::Answer::new(form_data.question.to_owned(), hexagram, r_hexagram);
     let new_answer_id = new_answer.save();
@@ -38,8 +41,12 @@ async fn question(form_data: Form<FormData>) -> Redirect {
 
 #[get("/answer/<id>")]
 fn answer(id: u64) -> Template {
+    // ---------------------------------------
     // TODO: check result here
+    // ---------------------------------------
     let answer = iching::Answer::get_by_id(id);
+    // ---------------------------------------
+
     wires::display(answer.hexagram);
     Template::render(
         "answer",
@@ -47,9 +54,20 @@ fn answer(id: u64) -> Template {
     )
 }
 
+#[catch(404)]
+pub fn not_found() -> Redirect {
+    Redirect::to("/")
+}
+
+#[catch(500)]
+pub fn internal_error() -> Redirect {
+    Redirect::to("/")
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![home, question, answer])
+        .register("/", catchers![not_found, internal_error])
         .attach(Template::fairing())
 }
