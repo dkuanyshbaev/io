@@ -2,6 +2,8 @@
 use std::collections::HashMap;
 use warp::{http::Uri, Filter};
 
+pub mod templates;
+
 #[tokio::main]
 async fn main() {
     println!("starting ioracle");
@@ -12,23 +14,7 @@ async fn main() {
     // warn!("o_O");
     // error!("boom");
 
-    let home_body = r#"
-    <html>
-        <head>
-            <title>IOracle</title>
-        </head>
-        <body>
-            <h1>Welcome to IOracle!</h1>
-            <form action="/question" method="post">
-                <label for="question">Question:</label>
-                <input id="question" type="text" name="question">
-                <input type="submit" value="Ask">
-            </form>
-        </body>
-    </html>
-    "#;
-
-    let home = warp::path::end().map(move || warp::reply::html(home_body));
+    let home = warp::path::end().map(move || warp::reply::html(templates::HOME));
     let answer = warp::path!("answer" / u32).map(|a| format!("answer num {}", a));
     let question = warp::path!("question")
         .and(warp::post())
