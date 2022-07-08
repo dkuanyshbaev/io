@@ -1,10 +1,12 @@
 // ---------------------------------------
 // IOracle main server
 // ---------------------------------------
+use futures::channel::mpsc;
 use rocket::{
     form::Form,
     response::Redirect,
     tokio::time::{sleep, Duration},
+    State,
 };
 use rocket_dyn_templates::Template;
 
@@ -19,19 +21,28 @@ struct FormData {
     question: String,
 }
 
+pub enum ControllCommand {
+    Rest,
+    Read,
+    Display(String),
+}
+
 #[get("/")]
-fn home() -> Template {
-    wires::rest();
+async fn home(controll_channel: &State<mpsc::UnboundedSender<ControllCommand>>) -> Template {
+    controll_channel.unbounded_send(ControllCommand::Rest);
     Template::render("home", rocket_dyn_templates::context! {})
 }
 
 #[post("/question", data = "<form_data>")]
-async fn question(form_data: Form<FormData>) -> Redirect {
+async fn question(
+    form_data: Form<FormData>,
+    controll_channel: &State<mpsc::UnboundedSender<ControllCommand>>,
+) -> Redirect {
     // ---------------------------------------
-    // TODO: real readings
+    // TODO: ???
     // ---------------------------------------
     let (hexagram, r_hexagram) = wires::read();
-    sleep(Duration::from_secs(10)).await;
+    controll_channel.unbounded_send(crate::ControllCommand::Read);
     // ---------------------------------------
 
     let new_answer = iching::Answer::new(form_data.question.to_owned(), hexagram, r_hexagram);
@@ -40,14 +51,19 @@ async fn question(form_data: Form<FormData>) -> Redirect {
 }
 
 #[get("/answer/<id>")]
-fn answer(id: u64) -> Template {
+async fn answer(
+    id: u64,
+    controll_channel: &State<mpsc::UnboundedSender<ControllCommand>>,
+) -> Template {
     // ---------------------------------------
     // TODO: check result here
     // ---------------------------------------
     let answer = iching::Answer::get_by_id(id);
     // ---------------------------------------
 
-    wires::display(answer.hexagram);
+    controll_channel.unbounded_send(crate::ControllCommand::Display(answer.hexagram));
+
+    // wires::display(answer.hexagram, controll_channel.inner().to_owned()).await;
     Template::render(
         "answer",
         rocket_dyn_templates::context! { answer: answer.answer },
@@ -66,8 +82,20 @@ pub fn internal_error() -> Redirect {
 
 #[launch]
 fn rocket() -> _ {
+    // ---------------------------------------
+    let (sender, receiver): (
+        mpsc::UnboundedSender<ControllCommand>,
+        mpsc::UnboundedReceiver<ControllCommand>,
+    ) = mpsc::unbounded();
+
+    rocket::tokio::spawn(async move {
+        wires::go(receiver).await;
+    });
+    // ---------------------------------------
+
     rocket::build()
         .mount("/", routes![home, question, answer])
         .register("/", catchers![not_found, internal_error])
         .attach(Template::fairing())
+        .manage(sender)
 }
