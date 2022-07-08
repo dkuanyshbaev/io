@@ -4,7 +4,13 @@
 use futures::channel::mpsc;
 use rocket::tokio::time::{sleep, Duration};
 
-pub async fn go(mut receiver: mpsc::UnboundedReceiver<crate::ControllCommand>) {
+pub enum ControllCommand {
+    Rest,
+    Read,
+    Display(String),
+}
+
+pub async fn go(mut receiver: mpsc::UnboundedReceiver<ControllCommand>) {
     println!("go!");
 
     loop {
@@ -12,9 +18,9 @@ pub async fn go(mut receiver: mpsc::UnboundedReceiver<crate::ControllCommand>) {
         match receiver.try_next() {
             // message is fetched
             Ok(Some(t)) => match t {
-                crate::ControllCommand::Rest => println!("Resting -------------------------"),
-                crate::ControllCommand::Read => println!("Reading -------------------------"),
-                crate::ControllCommand::Display(h) => {
+                ControllCommand::Rest => println!("Resting -------------------------"),
+                ControllCommand::Read => println!("Reading -------------------------"),
+                ControllCommand::Display(h) => {
                     println!("Displaing ------------------------- {}", h)
                 }
             },
@@ -30,50 +36,15 @@ pub async fn go(mut receiver: mpsc::UnboundedReceiver<crate::ControllCommand>) {
     }
 }
 
-pub async fn rest(sender: mpsc::UnboundedSender<crate::ControllCommand>) {
-    println!("resting");
-
-    // rocket::tokio::spawn(async move {
-    //     loop {
-    //         sleep(Duration::from_secs(2)).await;
-    //         sender.unbounded_send(crate::Command::Rest);
-    //     }
-    // });
-
-    // loop {
-    //     sleep(Duration::from_secs(2)).await;
-    //     sender.unbounded_send("test".to_string());
-    // }
-
+pub async fn read(controll_channel: mpsc::UnboundedSender<ControllCommand>) -> (String, String) {
+    let _ = controll_channel.unbounded_send(ControllCommand::Read);
     // ---------------------------------------
-    // TODO: leds
+    // TODO: ???
     // ---------------------------------------
-}
-
-pub fn read() -> (String, String) {
-    println!("reading");
 
     // ---------------------------------------
     // TODO: alot
     // ---------------------------------------
 
     ("111000".to_string(), "000111".to_string())
-}
-
-pub async fn display(hexagram: String, sender: mpsc::UnboundedSender<crate::ControllCommand>) {
-    println!("displaing");
-
-    rocket::tokio::spawn(async move {
-        loop {
-            sleep(Duration::from_secs(2)).await;
-            sender.unbounded_send(crate::ControllCommand::Display(hexagram.clone()));
-        }
-    });
-
-    // ---------------------------------------
-    // TODO: leds
-    // TODO: sound
-    // TODO: pump
-    // TODO: fan
-    // ---------------------------------------
 }
