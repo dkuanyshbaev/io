@@ -7,11 +7,12 @@ use rocket::tokio::time::{sleep, Duration};
 use rppal::gpio::Gpio;
 use rs_ws281x::{ChannelBuilder, Controller, ControllerBuilder, StripType};
 
-// const MULTY: i32 = 1;
-// const BIAS: i32 = 500;
-// const THRESH: i32 = 10;
+// const MULTY: f32 = 1.0;
+const BIAS: f32 = 500.0;
+const THRESHOLD: f32 = 10.0;
 
 const LINE_READING_SLEEP: u64 = 3;
+// const PIP_READING_DURATION: u64 = 2;
 const LEDS_IN_LINE: i32 = 144;
 const RESTING_LI_COLOUR: [u8; 4] = [0, 0, 0, 0];
 const RESTING_YAO_COLOUR: [u8; 4] = [0, 0, 0, 0];
@@ -126,40 +127,44 @@ pub async fn read(command_sender: mpsc::UnboundedSender<Command>) -> (Hexagram, 
     for i in 1..4 {
         let line = read_line();
         hexagram = format!("{}{}", hexagram, line);
-        println!("line{}: {}", i, line);
+        println!("Line{}: {}", i, line);
         sleep(Duration::from_secs(LINE_READING_SLEEP)).await;
     }
 
+    // React
     // TODO: react(hexagram);
 
     // Get related lines
     for i in 1..4 {
         let line = read_line();
         tmp_hexagram = format!("{}{}", tmp_hexagram, line);
-        println!("related line{}: {}", i, line);
+        println!("Related line{}: {}", i, line);
         sleep(Duration::from_secs(LINE_READING_SLEEP)).await;
     }
 
+    // Stop reaction
     // TODO: drop_pins();
 
     // Get second trigram
     for i in 4..7 {
         let line = read_line();
         hexagram = format!("{}{}", hexagram, line);
-        println!("line{}: {}", i, line);
+        println!("Line{}: {}", i, line);
         sleep(Duration::from_secs(LINE_READING_SLEEP)).await;
     }
 
+    // React
     // TODO: react(hexagram);
 
     // Get next related lines
     for i in 4..7 {
         let line = read_line();
         tmp_hexagram = format!("{}{}", tmp_hexagram, line);
-        println!("related line{}: {}", i, line);
+        println!("Related line{}: {}", i, line);
         sleep(Duration::from_secs(LINE_READING_SLEEP)).await;
     }
 
+    // Stop reaction
     // TODO: drop_pins();
 
     // Calculate related hexagram
@@ -175,7 +180,7 @@ pub async fn read(command_sender: mpsc::UnboundedSender<Command>) -> (Hexagram, 
             r_hexagram = format!("{}{}", r_hexagram, x);
         }
     }
-    println!("hexagram:{}, r_hexagram: {}", hexagram, r_hexagram);
+    println!("Hexagram: {}, R_Hexagram: {}", hexagram, r_hexagram);
 
     (hexagram, r_hexagram)
 }
@@ -205,12 +210,9 @@ pub fn display(command_sender: mpsc::UnboundedSender<Command>, hexagram: Hexagra
     }
 }
 
-fn read_line() -> u8 {
-    1
-}
-
 //----------------------------------------------------------------------
 // render the line
+//----------------------------------------------------------------------
 // pub fn render(l: u8, line_num: i32, controller: &mut Controller, colour: &String) {
 //     match l {
 //         1 => render_yang(line_num, controller, colour),
@@ -250,183 +252,117 @@ fn read_line() -> u8 {
 //         println!("{:?}", e);
 //     };
 // }
-//
+//----------------------------------------------------------------------
+
+fn read_line() -> u8 {
+    let data = read_the_pip();
+
+    // let mut min = 0;
+    // if let Some(m) = data.iter().min() {
+    //     min = *m;
+    // };
+
+    // let mut max = 0;
+    // if let Some(m) = data.iter().max() {
+    //     max = *m;
+    // };
+
+    let n_data = data.iter().map(|&i| i as f32 - BIAS).collect::<Vec<f32>>();
+
+    let mut mins: Vec<f32> = vec![];
+    let mut maxs: Vec<f32> = vec![];
+    for i in n_data.windows(3) {
+        if i[1] > i[0] && i[1] > i[2] && i[1] > THRESHOLD {
+            // println!("local max extremum = {:?}", i[1]);
+            maxs.push(i[1]);
+        }
+        if i[1] < i[0] && i[1] < i[2] && i[1].abs() > THRESHOLD {
+            // println!("local min extremum = {:?}", i[1]);
+            mins.push(i[1]);
+        }
+        // println!("windows iter = {:?}", i);
+    }
+
+    // println!("mins = {:?}", mins);
+    // println!("mins len = {:?}", mins.len());
+    // println!("maxs = {:?}", maxs);
+    // println!("maxs len = {:?}", maxs.len());
+
+    if maxs.len() > mins.len() {
+        1
+    } else {
+        0
+    }
+}
+
 // read pip data from the serial port
 // install arduino ide + teense support to read from serial port on rpi
-// pub fn read_the_pip(delta: u64) -> Vec<i32> {
-//     let s = SerialPortSettings {
-//         baud_rate: 9600,
-//         data_bits: DataBits::Eight,
-//         flow_control: FlowControl::None,
-//         parity: Parity::None,
-//         stop_bits: StopBits::One,
-//         timeout: Duration::from_secs(1),
-//     };
-//
-//     let mut data: Vec<i32> = vec![];
-//     if let Ok(mut port) = serialport::open_with_settings("/dev/ttyACM0", &s) {
-//         let mut serial_buf: Vec<u8> = vec![0; 512];
-//         let start = SystemTime::now();
-//         loop {
-//             if let Ok(d) = start.elapsed() {
-//                 if d > Duration::from_secs(delta) {
-//                     break;
-//                 };
-//             }
-//             match port.read(serial_buf.as_mut_slice()) {
-//                 Ok(t) => {
-//                     // println!("Pip val: {}", get_val(&serial_buf[..t]));
-//                     data.push(get_val(&serial_buf[..t]));
-//                 }
-//                 Err(e) => eprintln!("{:?}", e),
-//             }
-//         }
-//     }
-//
-//     data
-// }
-//
-// pub fn get_val(buf: &[u8]) -> i32 {
-//     let mut output = 0;
-//     let serial_data = std::str::from_utf8(buf).unwrap();
-//     if let Some(i) = serial_data.find("PiPVal: ") {
-//         let s = &serial_data[i + 8..];
-//         if let Some(j) = s.find("\r") {
-//             let str_value = &s[..j];
-//             if let Ok(value) = str_value.parse::<i32>() {
-//                 output = value;
-//             }
-//         }
-//     }
-//
-//     output
-// }
-//
-// // read the pip data with timer and parameters
-// pub fn read(delta: u64, m: String, b: String, t: String) -> u8 {
-//     let _m: f32 = m.parse().unwrap_or_else(|_| 1.0);
-//     let b: f32 = b.parse().unwrap_or_else(|_| 0.0);
-//     let t: f32 = t.parse().unwrap_or_else(|_| 0.0);
-//
-//     let data = read_the_pip(delta);
-//     println!("data: {:?}", data);
-//
-//     let mut min = 0;
-//     if let Some(m) = data.iter().min() {
-//         min = *m;
-//     };
-//     println!("min: {}", min);
-//
-//     let mut max = 0;
-//     if let Some(m) = data.iter().max() {
-//         max = *m;
-//     };
-//     println!("max: {}", max);
-//
-//     let n_data = data.iter().map(|&i| i as f32 - b).collect::<Vec<f32>>();
-//     println!("n_data = {:?}", n_data);
-//
-//     let mut mins: Vec<f32> = vec![];
-//     let mut maxs: Vec<f32> = vec![];
-//     for i in n_data.windows(3) {
-//         if i[1] > i[0] && i[1] > i[2] && i[1] > t {
-//             // println!("local max extremum = {:?}", i[1]);
-//             maxs.push(i[1]);
-//         }
-//         if i[1] < i[0] && i[1] < i[2] && i[1].abs() > t {
-//             // println!("local min extremum = {:?}", i[1]);
-//             mins.push(i[1]);
-//         }
-//         // println!("windows iter = {:?}", i);
-//     }
-//
-//     // println!("mins = {:?}", mins);
-//     // println!("mins len = {:?}", mins.len());
-//     // println!("maxs = {:?}", maxs);
-//     // println!("maxs len = {:?}", maxs.len());
-//
-//     if maxs.len() > mins.len() {
-//         1
-//     } else {
-//         0
-//     }
-// }
-// turn the pins on and off on rpi model 4
-// pub fn pin_on(pin: u8) {
-//     println!("--------> pin {}: on", pin);
-//
-//     if pin == 8 {
-//         pin8_start();
-//         // if let Ok(gpio) = Gpio::new() {
-//         //     if let Ok(pin8) = gpio.get(8) {
-//         //         let mut pin8 = pin8.into_output();
-//         //         pin8.set_high();
-//         //         thread::sleep(Duration::from_secs(6));
-//         //         pin8.set_low();
-//         //     }
-//         // }
-//     } else if pin == 7 {
-//         pin7_start();
-//         // if let Ok(gpio) = Gpio::new() {
-//         //     if let Ok(pin7) = gpio.get(7) {
-//         //         let mut pin7 = pin7.into_output();
-//         //         pin7.set_high();
-//         //         thread::sleep(Duration::from_secs(4));
-//         //         pin7.set_low();
-//         //     }
-//         // }
-//     } else {
-//         if let Ok(gpio) = Gpio::new() {
-//             if let Ok(pin) = gpio.get(pin) {
-//                 let mut pin = pin.into_output();
-//                 pin.set_high();
-//             }
-//         }
-//     }
-//     if pin == 6 || pin == 7 || pin == 8 {
-//         check_the_pumps();
-//     }
-// }
-//
-// pub fn pin_off(pin: u8) {
-//     println!("--------> pin {}: off", pin);
-//
-//     if let Ok(gpio) = Gpio::new() {
-//         if let Ok(pin) = gpio.get(pin) {
-//             let mut pin = pin.into_output();
-//             pin.set_low();
-//         }
-//     }
-// }
-//
-// pub fn pin7_start() {
-//     println!("--------> pin7");
-//
-//     if let Err(e) = process::Command::new("/ioracle/scripts/pin7.sh").output() {
-//         println!("pin7 error: {:?}", e);
-//     }
-// }
-//
-// pub fn pin8_start() {
-//     println!("--------> pin8");
-//
-//     if let Err(e) = process::Command::new("/ioracle/scripts/pin8.sh").output() {
-//         println!("pin8 error: {:?}", e);
-//     }
-// }
-// pub fn get_related(h: &String, r: &String) -> String {
-//     let mut result = "".to_string();
-//     for (x, y) in h.chars().zip(r.chars()) {
-//         if x.eq(&y) {
-//             if x.eq(&'0') {
-//                 result = format!("{}1", result);
-//             } else {
-//                 result = format!("{}0", result);
-//             }
-//         } else {
-//             result = format!("{}{}", result, x);
-//         }
-//     }
-//
-//     result
-// }
+pub fn read_the_pip() -> Vec<i32> {
+    let data = vec![1, 3, 2];
+    // let s = SerialPortSettings {
+    //     baud_rate: 9600,
+    //     data_bits: DataBits::Eight,
+    //     flow_control: FlowControl::None,
+    //     parity: Parity::None,
+    //     stop_bits: StopBits::One,
+    //     timeout: Duration::from_secs(1),
+    // };
+    //
+    // let mut data: Vec<i32> = vec![];
+    // if let Ok(mut port) = serialport::open_with_settings("/dev/ttyACM0", &s) {
+    //     let mut serial_buf: Vec<u8> = vec![0; 512];
+    //     let start = SystemTime::now();
+    //     loop {
+    //         if let Ok(d) = start.elapsed() {
+    //             if d > Duration::from_secs(delta) {
+    //                 break;
+    //             };
+    //         }
+    //         match port.read(serial_buf.as_mut_slice()) {
+    //             Ok(t) => {
+    //                 // println!("Pip val: {}", get_val(&serial_buf[..t]));
+    //                 data.push(get_val(&serial_buf[..t]));
+    //             }
+    //             Err(e) => eprintln!("{:?}", e),
+    //         }
+    //     }
+    // }
+
+    data
+}
+
+pub fn get_val(buf: &[u8]) -> i32 {
+    let mut output = 0;
+    let serial_data = std::str::from_utf8(buf).unwrap();
+    if let Some(i) = serial_data.find("PiPVal: ") {
+        let s = &serial_data[i + 8..];
+        if let Some(j) = s.find("\r") {
+            let str_value = &s[..j];
+            if let Ok(value) = str_value.parse::<i32>() {
+                output = value;
+            }
+        }
+    }
+
+    output
+}
+
+pub fn pin_on(pin: u8) {
+    println!("Pin number {} is on now.", pin);
+    if let Ok(gpio) = Gpio::new() {
+        if let Ok(pin) = gpio.get(pin) {
+            let mut pin = pin.into_output();
+            pin.set_high();
+        }
+    }
+}
+
+pub fn pin_off(pin: u8) {
+    println!("Pin number {} is off now.", pin);
+    if let Ok(gpio) = Gpio::new() {
+        if let Ok(pin) = gpio.get(pin) {
+            let mut pin = pin.into_output();
+            pin.set_low();
+        }
+    }
+}
