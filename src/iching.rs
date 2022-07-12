@@ -1,15 +1,17 @@
 // ---------------------------------------
 // IOracle iching core
 // ---------------------------------------
+pub type Hexagram = String;
+
 pub struct Answer {
     pub question: String,
     pub answer: String,
-    pub hexagram: String,
-    pub r_hexagram: String,
+    pub hexagram: Hexagram,
+    pub r_hexagram: Hexagram,
 }
 
 impl Answer {
-    pub fn new(question: String, hexagram: String, r_hexagram: String) -> Self {
+    pub fn new(question: String, hexagram: Hexagram, r_hexagram: Hexagram) -> Self {
         // ---------------------------------------
         // TODO: generate answer to question!
         // ---------------------------------------
