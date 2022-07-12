@@ -1,0 +1,12 @@
+[Unit]
+Description=IOracle
+After=network.target
+
+[Service]
+ExecStart=/home/username/run/io
+WorkingDirectory=/home/username/run
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target

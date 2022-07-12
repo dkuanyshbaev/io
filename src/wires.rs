@@ -14,10 +14,12 @@ const THRESHOLD: f32 = 10.0;
 const LINE_READING_SLEEP: u64 = 3;
 // const PIP_READING_DURATION: u64 = 2;
 const LEDS_IN_LINE: i32 = 144;
-const RESTING_LI_COLOUR: [u8; 4] = [0, 0, 0, 0];
-const RESTING_YAO_COLOUR: [u8; 4] = [0, 0, 0, 0];
-const DEFAULT_LI_COLOUR: [u8; 4] = [0, 0, 0, 0];
-const DEFAULT_YAO_COLOUR: [u8; 4] = [0, 0, 0, 0];
+const RESTING_LI_COLOUR: [u8; 4] = [255, 2, 14, 0];
+const RESTING_YAO_COLOUR: [u8; 4] = [255, 2, 14, 0];
+const READING_LI_COLOUR: [u8; 4] = [38, 2, 255, 0];
+const READING_YAO_COLOUR: [u8; 4] = [38, 2, 255, 0];
+const DISPLAYING_LI_COLOUR: [u8; 4] = [121, 255, 0, 0];
+const DISPLAYING_YAO_COLOUR: [u8; 4] = [121, 255, 0, 0];
 
 // const DEFAULT_COLOUR: &str = "rgb(51, 0, 180)";
 // const LI_COLOUR: &str = "rgb(230, 4, 211)";
@@ -54,7 +56,7 @@ pub async fn hardware_controll(mut receiver: mpsc::UnboundedReceiver<Command>) {
                 }
                 Command::Display(h) => {
                     // ???
-                    println!("Displaing {}", h);
+                    println!("Displaying {}", h);
                 }
             },
             // Channel is closed and no messages left in the queue.
@@ -120,6 +122,25 @@ pub fn rest(command_sender: mpsc::UnboundedSender<Command>) {
 pub async fn read(command_sender: mpsc::UnboundedSender<Command>) -> (Hexagram, Hexagram) {
     println!("Reading..");
     let _ = command_sender.unbounded_send(Command::Read);
+
+    if let Ok(mut controller) = build_controller(100) {
+        let yao = controller.leds_mut(0);
+        for num in 0..yao.len() {
+            yao[num as usize] = READING_YAO_COLOUR;
+        }
+
+        let li = controller.leds_mut(1);
+        for num in 0..li.len() {
+            li[num as usize] = READING_LI_COLOUR;
+        }
+
+        if let Err(e) = controller.render() {
+            println!("Reading render error: {:?}", e);
+        }
+    } else {
+        println!("NO LED!");
+    }
+
     let mut hexagram = "".to_string();
     let mut tmp_hexagram = "".to_string();
 
@@ -186,7 +207,7 @@ pub async fn read(command_sender: mpsc::UnboundedSender<Command>) -> (Hexagram, 
 }
 
 pub fn display(command_sender: mpsc::UnboundedSender<Command>, hexagram: Hexagram) {
-    println!("Displaing..");
+    println!("Displaying..");
     let _ = command_sender.unbounded_send(Command::Display(hexagram));
 
     // TODO: parse hexagram, get colours
@@ -194,16 +215,16 @@ pub fn display(command_sender: mpsc::UnboundedSender<Command>, hexagram: Hexagra
     if let Ok(mut controller) = build_controller(100) {
         let yao = controller.leds_mut(0);
         for num in 0..yao.len() {
-            yao[num as usize] = DEFAULT_YAO_COLOUR;
+            yao[num as usize] = DISPLAYING_YAO_COLOUR;
         }
 
         let li = controller.leds_mut(1);
         for num in 0..li.len() {
-            li[num as usize] = DEFAULT_LI_COLOUR;
+            li[num as usize] = DISPLAYING_LI_COLOUR;
         }
 
         if let Err(e) = controller.render() {
-            println!("Displaing render error: {:?}", e);
+            println!("Displaying render error: {:?}", e);
         }
     } else {
         println!("NO LED!");
