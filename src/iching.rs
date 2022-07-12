@@ -1,5 +1,5 @@
 // ---------------------------------------
-// IOracle iching core
+// IOracle iching
 // ---------------------------------------
 pub type Hexagram = String;
 

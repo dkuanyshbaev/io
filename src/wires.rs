@@ -1,17 +1,22 @@
 // ---------------------------------------
-// IOracle hardware controll center
+// IOracle hardware
 // ---------------------------------------
+use crate::iching::Hexagram;
 use futures::channel::mpsc;
 use rocket::tokio::time::{sleep, Duration};
-// use rppal::gpio::Gpio;
-use crate::iching::Hexagram;
+use rppal::gpio::Gpio;
 use rs_ws281x::{ChannelBuilder, Controller, ControllerBuilder, StripType};
 
+// const MULTY: i32 = 1;
+// const BIAS: i32 = 500;
+// const THRESH: i32 = 10;
+
+const LINE_READING_SLEEP: u64 = 3;
 const LEDS_IN_LINE: i32 = 144;
+const RESTING_LI_COLOUR: [u8; 4] = [0, 0, 0, 0];
+const RESTING_YAO_COLOUR: [u8; 4] = [0, 0, 0, 0];
 const DEFAULT_LI_COLOUR: [u8; 4] = [0, 0, 0, 0];
 const DEFAULT_YAO_COLOUR: [u8; 4] = [0, 0, 0, 0];
-
-// const DEFAULT_COLOUR: [u8; 4] = [0, 0, 0, 0];
 
 // const DEFAULT_COLOUR: &str = "rgb(51, 0, 180)";
 // const LI_COLOUR: &str = "rgb(230, 4, 211)";
@@ -28,31 +33,6 @@ pub enum Command {
     Rest,
     Read,
     Display(String),
-}
-
-pub fn build_controller(brightness: u8) -> rs_ws281x::Result<Controller> {
-    ControllerBuilder::new()
-        .freq(800_000)
-        .dma(10)
-        .channel(
-            0,
-            ChannelBuilder::new()
-                .pin(12)
-                .count(6 * LEDS_IN_LINE)
-                .strip_type(StripType::Ws2811Rgb)
-                .brightness(brightness)
-                .build(),
-        )
-        .channel(
-            1,
-            ChannelBuilder::new()
-                .pin(13)
-                .count(3 * LEDS_IN_LINE)
-                .strip_type(StripType::Ws2811Rgb)
-                .brightness(brightness)
-                .build(),
-        )
-        .build()
 }
 
 pub async fn hardware_controll(mut receiver: mpsc::UnboundedReceiver<Command>) {
@@ -81,11 +61,36 @@ pub async fn hardware_controll(mut receiver: mpsc::UnboundedReceiver<Command>) {
                 println!("None");
             }
             // There are no messages available, but channel is not yet closed.
-            Err(e) => {
-                println!("e: {}", e);
+            Err(_e) => {
+                // println!("No messages: {}", e);
             }
         }
     }
+}
+
+pub fn build_controller(brightness: u8) -> rs_ws281x::Result<Controller> {
+    ControllerBuilder::new()
+        .freq(800_000)
+        .dma(10)
+        .channel(
+            0,
+            ChannelBuilder::new()
+                .pin(12)
+                .count(6 * LEDS_IN_LINE)
+                .strip_type(StripType::Ws2811Rgb)
+                .brightness(brightness)
+                .build(),
+        )
+        .channel(
+            1,
+            ChannelBuilder::new()
+                .pin(13)
+                .count(3 * LEDS_IN_LINE)
+                .strip_type(StripType::Ws2811Rgb)
+                .brightness(brightness)
+                .build(),
+        )
+        .build()
 }
 
 pub fn rest(command_sender: mpsc::UnboundedSender<Command>) {
@@ -95,12 +100,12 @@ pub fn rest(command_sender: mpsc::UnboundedSender<Command>) {
     if let Ok(mut controller) = build_controller(50) {
         let yao = controller.leds_mut(0);
         for num in 0..yao.len() {
-            yao[num as usize] = DEFAULT_YAO_COLOUR;
+            yao[num as usize] = RESTING_YAO_COLOUR;
         }
 
         let li = controller.leds_mut(1);
         for num in 0..li.len() {
-            li[num as usize] = DEFAULT_LI_COLOUR;
+            li[num as usize] = RESTING_LI_COLOUR;
         }
 
         if let Err(e) = controller.render() {
@@ -114,8 +119,65 @@ pub fn rest(command_sender: mpsc::UnboundedSender<Command>) {
 pub async fn read(command_sender: mpsc::UnboundedSender<Command>) -> (Hexagram, Hexagram) {
     println!("Reading..");
     let _ = command_sender.unbounded_send(Command::Read);
+    let mut hexagram = "".to_string();
+    let mut tmp_hexagram = "".to_string();
 
-    ("111000".to_string(), "000111".to_string())
+    // Get first trigram
+    for i in 1..4 {
+        let line = read_line();
+        hexagram = format!("{}{}", hexagram, line);
+        println!("line{}: {}", i, line);
+        sleep(Duration::from_secs(LINE_READING_SLEEP)).await;
+    }
+
+    // TODO: react(hexagram);
+
+    // Get related lines
+    for i in 1..4 {
+        let line = read_line();
+        tmp_hexagram = format!("{}{}", tmp_hexagram, line);
+        println!("related line{}: {}", i, line);
+        sleep(Duration::from_secs(LINE_READING_SLEEP)).await;
+    }
+
+    // TODO: drop_pins();
+
+    // Get second trigram
+    for i in 4..7 {
+        let line = read_line();
+        hexagram = format!("{}{}", hexagram, line);
+        println!("line{}: {}", i, line);
+        sleep(Duration::from_secs(LINE_READING_SLEEP)).await;
+    }
+
+    // TODO: react(hexagram);
+
+    // Get next related lines
+    for i in 4..7 {
+        let line = read_line();
+        tmp_hexagram = format!("{}{}", tmp_hexagram, line);
+        println!("related line{}: {}", i, line);
+        sleep(Duration::from_secs(LINE_READING_SLEEP)).await;
+    }
+
+    // TODO: drop_pins();
+
+    // Calculate related hexagram
+    let mut r_hexagram = "".to_string();
+    for (x, y) in hexagram.chars().zip(tmp_hexagram.chars()) {
+        if x.eq(&y) {
+            if x.eq(&'0') {
+                r_hexagram = format!("{}1", r_hexagram);
+            } else {
+                r_hexagram = format!("{}0", r_hexagram);
+            }
+        } else {
+            r_hexagram = format!("{}{}", r_hexagram, x);
+        }
+    }
+    println!("hexagram:{}, r_hexagram: {}", hexagram, r_hexagram);
+
+    (hexagram, r_hexagram)
 }
 
 pub fn display(command_sender: mpsc::UnboundedSender<Command>, hexagram: Hexagram) {
@@ -141,6 +203,10 @@ pub fn display(command_sender: mpsc::UnboundedSender<Command>, hexagram: Hexagra
     } else {
         println!("NO LED!");
     }
+}
+
+fn read_line() -> u8 {
+    1
 }
 
 //----------------------------------------------------------------------

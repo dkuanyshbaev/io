@@ -1,5 +1,5 @@
 // ---------------------------------------
-// IOracle main server
+// IOracle server
 // ---------------------------------------
 use futures::channel::mpsc;
 use rocket::{form::Form, response::Redirect, State};
@@ -17,7 +17,7 @@ struct FormData {
 }
 
 #[get("/")]
-async fn home(command_sender: &State<mpsc::UnboundedSender<wires::Command>>) -> Template {
+fn home(command_sender: &State<mpsc::UnboundedSender<wires::Command>>) -> Template {
     wires::rest(command_sender.inner().to_owned());
     Template::render("home", rocket_dyn_templates::context! {})
 }
@@ -34,10 +34,7 @@ async fn question(
 }
 
 #[get("/answer/<id>")]
-async fn answer(
-    id: u64,
-    command_sender: &State<mpsc::UnboundedSender<wires::Command>>,
-) -> Template {
+fn answer(id: u64, command_sender: &State<mpsc::UnboundedSender<wires::Command>>) -> Template {
     let answer = iching::Answer::get_by_id(id);
     wires::display(command_sender.inner().to_owned(), answer.hexagram);
     Template::render(
