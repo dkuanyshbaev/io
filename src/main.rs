@@ -3,6 +3,7 @@
 // ---------------------------------------
 use futures::channel::mpsc;
 use rocket::{form::Form, response::Redirect, State};
+use rocket_db_pools::{sqlx, Connection, Database};
 use rocket_dyn_templates::Template;
 
 #[macro_use]
@@ -16,6 +17,10 @@ struct FormData {
     question: String,
 }
 
+#[derive(Database)]
+#[database("ioracle")]
+pub struct Db(sqlx::SqlitePool);
+
 #[get("/")]
 fn home(command_sender: &State<mpsc::UnboundedSender<wires::Command>>) -> Template {
     wires::rest(command_sender.inner().to_owned());
@@ -26,16 +31,21 @@ fn home(command_sender: &State<mpsc::UnboundedSender<wires::Command>>) -> Templa
 async fn question(
     form_data: Form<FormData>,
     command_sender: &State<mpsc::UnboundedSender<wires::Command>>,
+    mut db: Connection<Db>,
 ) -> Redirect {
     let (hexagram, r_hexagram) = wires::read(command_sender.inner().to_owned()).await;
     let new_answer = iching::Answer::new(form_data.question.to_owned(), hexagram, r_hexagram);
-    let new_answer_id = new_answer.save();
+    let new_answer_id = new_answer.save(db);
     Redirect::to(format!("/answer/{}", new_answer_id))
 }
 
 #[get("/answer/<id>")]
-fn answer(id: u64, command_sender: &State<mpsc::UnboundedSender<wires::Command>>) -> Template {
-    let answer = iching::Answer::get_by_id(id);
+async fn answer(
+    id: u32,
+    command_sender: &State<mpsc::UnboundedSender<wires::Command>>,
+    mut db: Connection<Db>,
+) -> Template {
+    let answer = iching::Answer::get_by_id(db, id);
     wires::display(command_sender.inner().to_owned(), answer.hexagram);
     Template::render(
         "answer",
@@ -68,5 +78,6 @@ fn rocket() -> _ {
         .mount("/", routes![home, question, answer])
         .register("/", catchers![not_found, internal_error])
         .attach(Template::fairing())
+        .attach(Db::init())
         .manage(command_sender)
 }

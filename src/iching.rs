@@ -1,6 +1,9 @@
 // ---------------------------------------
 // IOracle iching
 // ---------------------------------------
+use futures::TryFutureExt;
+use rocket_db_pools::{sqlx, sqlx::Row, Connection, Database};
+
 pub type Hexagram = String;
 
 pub struct Answer {
@@ -25,10 +28,22 @@ impl Answer {
             r_hexagram,
         }
     }
-    pub fn get_by_id(_id: u64) -> Self {
+    pub fn get_by_id(mut db: Connection<crate::Db>, id: u32) -> Self {
         // ---------------------------------------
         // TODO: db search, return answer
         // ---------------------------------------
+        // sqlx::query("SELECT content FROM logs WHERE id = ?")
+        //     .bind(id)
+        //     .fetch_one(&mut *db)
+        //     .map_ok(|r| Db(r.content))
+        //     .await;
+        //
+        // sqlx::query("SELECT content FROM logs WHERE id = ?")
+        //     .bind(id)
+        //     .fetch_one(&mut *db)
+        //     .await
+        //     .and_then(|r| Ok(r.try_get(0)?))
+        //     .ok();
 
         Answer {
             question: "question".to_string(),
@@ -37,7 +52,7 @@ impl Answer {
             r_hexagram: "000111".to_string(),
         }
     }
-    pub fn save(self) -> u64 {
+    pub fn save(self, mut db: Connection<crate::Db>) -> u64 {
         // ---------------------------------------
         // TODO: save to db, return id
         // ---------------------------------------
